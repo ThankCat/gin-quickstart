@@ -1,0 +1,33 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go workspace/cache (optional local files)
+go.work
+go.work.sum
+
+# Build output
+bin/
+dist/
+
+# Air
+tmp/
+air_errors.log
+
+# Logs
+*.log
+
+# IDE/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.*
+!.env.example
