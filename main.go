@@ -1,66 +1,50 @@
 package main
 
 import (
-	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 )
 
 const learnGinDocsURL = "https://gin-gonic.com/zh-cn/docs/routing/api-design/"
 
-type AppError struct {
-	Status  int    `json:"-"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
+type Booking struct {
+	CheckIn  time.Time `form:"check_in" binding:"required,bookabledate" time_format:"2006-01-02"`
+	CheckOut time.Time `form:"check_out" binding:"required,gtfield=CheckIn,bookabledate" time_format:"2006-01-02"`
 }
 
-func (e *AppError) Error() string {
-	return e.Message
+var bookableDate validator.Func = func(fl validator.FieldLevel) bool {
+	date, ok := fl.Field().Interface().(time.Time)
+	if ok {
+		today := time.Now()
+		if today.After(date) {
+			return false
+		}
+	}
+	return true
 }
 
-var (
-	ErrNotFound     = &AppError{Status: 404, Code: "NOT_FOUND", Message: "resource not found"}
-	ErrUnauthorized = &AppError{Status: 401, Code: "UNAUTHORIZED", Message: "authentication required"}
-	ErrBadRequest   = &AppError{Status: 400, Code: "BAD_REQUEST", Message: "invalid request"}
-)
+func getBookable(c *gin.Context) {
+	var b Booking
 
-func ErrorHandler() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		ctx.Next()
-
-		if len(ctx.Errors) == 0 {
-			return
-		}
-
-		err := ctx.Errors.Last().Err
-		var appErr *AppError
-		if errors.As(err, &appErr) {
-			ctx.JSON(appErr.Status, gin.H{
-				"success": false,
-				"error":   gin.H{"code": appErr.Code, "message": appErr.Message},
-			})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"error":   gin.H{"code": "INTERNAL", "message": "an unexpected error occurred"},
-			})
-		}
+	if err := c.ShouldBindWith(&b, binding.Query); err == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "Booking dates are valid!"})
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 }
 
 func main() {
 	router := gin.Default()
 
-	router.GET("/api/items/:id", func(ctx *gin.Context) {
-		id := ctx.Param("id")
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("bookabledate", bookableDate)
+	}
 
-		if id == "0" {
-			ctx.Error(ErrNotFound)
-			return
-		}
-		ctx.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"id": id}})
-	})
+	router.GET("/bookable", getBookable)
 
 	router.Run(":8080") // listens on 0.0.0.0:8080 by default
 }
